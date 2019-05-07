@@ -32,8 +32,24 @@ subdirectory="$3";
 mybranch="$myname/$myticket";
 
 git checkout -b $mybranch || { printf "\n\nERROR: could not check out branch with name: $mybranch\n\n"; exit 1; }
-docker exec -t edx.devstack.lms bash -c "source /edx/app/edxapp/edxapp_env && cd /edx/app/edxapp/edx-platform/ && python-modernize -w $subdirectory && pytest $subdirectory" || { printf "\n\nERROR: Tests did not pass, or something went wrong trying to run tests.\n\n"; exit 1; }
+
+#docker exec -t edx.devstack.lms bash -c "source /edx/app/edxapp/edxapp_env && cd /edx/app/edxapp/edx-platform/ && python-modernize -w $subdirectory && pytest $subdirectory" || { printf "\n\nERROR: Tests did not pass, or something went wrong trying to run tests.\n\n"; exit 1; }
+# Just run python-modernize, skip tests
+docker exec -t edx.devstack.lms bash -c "source /edx/app/edxapp/edxapp_env && cd /edx/app/edxapp/edx-platform/ && python-modernize -w $subdirectory"
+
 git add $subdirectory || { printf "\n\nERROR: Could not 'git add' directory $subdirectory\n\n"; exit 1; }
-git commit -m"$mybranch" || { printf "\n\nERROR: Could not commit files to $mybranch\n\n"; exit 1; }
-git push origin "$mybranch" || { printf "\n\nERROR: Could not push branch to remote. If you are outside of the edX organization, you might consider first forking the repo, and then running this command to create a PR from within that checkout.\n\n"; exit 1; }
-hub pull-request -m"$myticket" || { printf "\n\nERROR: Did not successfully create PR for this conversion\n\n"; }
+git commit -m"$myticket: Run python-modernize on $subdirectory" || { printf "\n\nERROR: Could not commit files to $mybranch\n\n"; exit 1; }
+
+# skip pushing branch and PR
+#git push origin "$mybranch" || { printf "\n\nERROR: Could not push branch to remote. If you are outside of the edX organization, you might consider first forking the repo, and then running this command to create a PR from within that checkout.\n\n"; exit 1; }
+#hub pull-request -m"$myticket" || { printf "\n\nERROR: Did not successfully create PR for this conversion\n\n"; }
+
+echo "================================="
+echo "Running isort on $subdirectory..."
+docker exec -t edx.devstack.lms bash -c "source /edx/app/edxapp/edxapp_env && cd /edx/app/edxapp/edx-platform/ && isort -rc $subdirectory"
+git add $subdirectory || { printf "\n\nERROR: Could not 'git add' directory $subdirectory\n\n"; exit 1; }
+git commit -m"isort" || { printf "\n\nERROR: Could not commit files to $mybranch\n\n"; exit 1; }
+
+echo "================================="
+echo "Pylint results for $subdirectory:"
+docker exec -t edx.devstack.lms bash -c "source /edx/app/edxapp/edxapp_env && cd /edx/app/edxapp/edx-platform/ && pylint $subdirectory"
